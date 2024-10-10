@@ -1,58 +1,96 @@
+# File: xinhua-crawler/news_crawler/utils/tokenization.py
+
 import re
 import regex
 import jieba
+from typing import List
+from .cleaning import clean_cn, clean_en
 
-def tokenize_cn(news: str, min_len: int=5) -> list[list[str]]:
-    sentences = split_sentences_cn(news)
+# Precompile regex patterns for performance
+CN_PUNCTUATION_PATTERN = regex.compile(r'\p{P}')
+EN_PUNCTUATION_PATTERN = re.compile(r'[^\w\s]')
+SENTENCE_ENDINGS_CN = re.compile(r'[。！？]')
+SENTENCE_ENDINGS_EN = re.compile(
+    r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|\!)(?=\s|$)'
+)
+
+def tokenize_cn(text: str, min_len: int = 5) -> List[List[str]]:
+    """
+    Tokenize Chinese text into a list of tokenized sentences.
     
-    # 对每个句子进行分词
+    Args:
+        text (str): The Chinese text to tokenize.
+        min_len (int): Minimum number of tokens required for a sentence.
+        
+    Returns:
+        List[List[str]]: Tokenized sentences.
+    """
+    cleaned_text = clean_cn(text)
+    sentences = split_sentences_cn(cleaned_text)
+    
     tokenized_sentences = []
     for sentence in sentences:
-        tokens = jieba.lcut(sentence)  # 使用 jieba 进行分词
-        # 使用 re.sub 删除所有标点符号，匹配 Unicode 标点类 \p{P}
-        tokens = [regex.sub(r'\p{P}', '', token) for token in tokens]
-        tokens = [token for token in tokens if token]  # 保留非空词
-        if len(tokens) < min_len:
-            continue
-        tokenized_sentences.append(tokens)
+        tokens = jieba.lcut(sentence)
+        tokens = [CN_PUNCTUATION_PATTERN.sub('', token) for token in tokens]
+        tokens = [token for token in tokens if token]
+        if len(tokens) >= min_len:
+            tokenized_sentences.append(tokens)
     
     return tokenized_sentences
 
-def tokenize_en(news: str, min_len: int=5) -> list[list[str]]:
-    sentences = split_sentences_en(news)
+def tokenize_en(text: str, min_len: int = 5) -> List[List[str]]:
+    """
+    Tokenize English text into a list of tokenized sentences.
     
-    # 对每个句子进行分词
+    Args:
+        text (str): The English text to tokenize.
+        min_len (int): Minimum number of tokens required for a sentence.
+        
+    Returns:
+        List[List[str]]: Tokenized sentences.
+    """
+    cleaned_text = clean_en(text)
+    sentences = split_sentences_en(cleaned_text)
+    
     tokenized_sentences = []
     for sentence in sentences:
         tokens = sentence.split()
-        # 删除所有的标点符号
-        tokens = [re.sub(r'[^\w\s]', '', token) for token in tokens]
-        tokens = [token.lower() for token in tokens if token]  # 保留非空词并转小写
+        tokens = [EN_PUNCTUATION_PATTERN.sub('', token).lower() for token in tokens]
+        tokens = [token for token in tokens if token]
         if len(tokens) < min_len:
             continue
-        nums = [token for token in tokens if token.isdigit()]
-        if len(nums) > len(tokens) // 2:
+        # Filter out sentences with excessive numeric content
+        num_tokens = sum(token.isdigit() for token in tokens)
+        if num_tokens > len(tokens) // 2:
             continue
         tokenized_sentences.append(tokens)
     
     return tokenized_sentences
 
-def split_sentences_cn(text: str) -> list[str]:
-    # 使用正则表达式匹配句子的结束符号：句号、问号、感叹号
-    sentence_endings = r'[。！？]'
-    sentences = re.split(sentence_endings, text)
+def split_sentences_cn(text: str) -> List[str]:
+    """
+    Split Chinese text into sentences based on punctuation.
     
-    # 去掉每个句子的前后空白字符，并过滤掉空字符串
+    Args:
+        text (str): The Chinese text to split.
+        
+    Returns:
+        List[str]: List of sentences.
+    """
+    sentences = SENTENCE_ENDINGS_CN.split(text)
     sentences = [s.strip() for s in sentences if s.strip()]
-    
     return sentences
 
-def split_sentences_en(text: str) -> list[str]:
-    # 使用正则表达式匹配句子结束符：句号、问号、感叹号，后面可能跟着引号或括号
-    sentence_endings = r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|\!)(?=\s|$)'
-    sentences = re.split(sentence_endings, text)
+def split_sentences_en(text: str) -> List[str]:
+    """
+    Split English text into sentences based on punctuation.
     
-    # 去掉每个句子的前后空白字符
+    Args:
+        text (str): The English text to split.
+        
+    Returns:
+        List[str]: List of sentences.
+    """
+    sentences = SENTENCE_ENDINGS_EN.split(text)
     sentences = [s.strip() for s in sentences if s.strip()]
-    
     return sentences
