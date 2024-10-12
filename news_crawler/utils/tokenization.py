@@ -3,8 +3,6 @@
 import re
 import regex
 import jieba
-from typing import List
-from .cleaning import clean_cn, clean_en
 
 # Precompile regex patterns for performance
 CN_PUNCTUATION_PATTERN = regex.compile(r'\p{P}')
@@ -13,8 +11,10 @@ SENTENCE_ENDINGS_CN = re.compile(r'[。！？]')
 SENTENCE_ENDINGS_EN = re.compile(
     r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|\!)(?=\s|$)'
 )
+NON_CN_PATTERN = regex.compile(r'[^\p{Han}]')
+NON_EN_PATTERN = re.compile(r'[^a-zA-Z]')
 
-def tokenize_cn(text: str, min_len: int = 5) -> List[List[str]]:
+def tokenize_cn(text: str, min_len: int = 5, only_cnchr: bool=False) -> list[list[str]]:
     """
     Tokenize Chinese text into a list of tokenized sentences.
     
@@ -25,20 +25,21 @@ def tokenize_cn(text: str, min_len: int = 5) -> List[List[str]]:
     Returns:
         List[List[str]]: Tokenized sentences.
     """
-    cleaned_text = clean_cn(text)
-    sentences = split_sentences_cn(cleaned_text)
+    sentences = split_sentences_cn(text)
     
     tokenized_sentences = []
     for sentence in sentences:
         tokens = jieba.lcut(sentence)
         tokens = [CN_PUNCTUATION_PATTERN.sub('', token) for token in tokens]
+        if only_cnchr:
+            tokens = [token for token in tokens if not NON_CN_PATTERN.search(token)]
         tokens = [token for token in tokens if token]
         if len(tokens) >= min_len:
             tokenized_sentences.append(tokens)
     
     return tokenized_sentences
 
-def tokenize_en(text: str, min_len: int = 5) -> List[List[str]]:
+def tokenize_en(text: str, min_len: int = 5) -> list[list[str]]:
     """
     Tokenize English text into a list of tokenized sentences.
     
@@ -49,8 +50,7 @@ def tokenize_en(text: str, min_len: int = 5) -> List[List[str]]:
     Returns:
         List[List[str]]: Tokenized sentences.
     """
-    cleaned_text = clean_en(text)
-    sentences = split_sentences_en(cleaned_text)
+    sentences = split_sentences_en(text)
     
     tokenized_sentences = []
     for sentence in sentences:
@@ -67,7 +67,7 @@ def tokenize_en(text: str, min_len: int = 5) -> List[List[str]]:
     
     return tokenized_sentences
 
-def split_sentences_cn(text: str) -> List[str]:
+def split_sentences_cn(text: str) -> list[str]:
     """
     Split Chinese text into sentences based on punctuation.
     
@@ -81,7 +81,7 @@ def split_sentences_cn(text: str) -> List[str]:
     sentences = [s.strip() for s in sentences if s.strip()]
     return sentences
 
-def split_sentences_en(text: str) -> List[str]:
+def split_sentences_en(text: str) -> list[str]:
     """
     Split English text into sentences based on punctuation.
     
